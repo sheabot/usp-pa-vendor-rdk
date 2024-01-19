@@ -17,32 +17,32 @@
  *
  * Copyright (C) 2019, Broadband Forum
  * Copyright (C) 2016-2021  CommScope, Inc
- * 
+ *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
  * are met:
- * 
+ *
  * 1. Redistributions of source code must retain the above copyright
  *    notice, this list of conditions and the following disclaimer.
- * 
+ *
  * 2. Redistributions in binary form must reproduce the above copyright
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
- * 
+ *
  * 3. Neither the name of the copyright holder nor the names of its
  *    contributors may be used to endorse or promote products derived from
  *    this software without specific prior written permission.
- * 
+ *
  * THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS"
  * AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
  * IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE
  * ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE
- * LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR 
- * CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF 
+ * LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR
+ * CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF
  * SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS
  * INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN
  * CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE)
- * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF 
+ * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF
  * THE POSSIBILITY OF SUCH DAMAGE.
  *
  */
@@ -235,7 +235,7 @@ int VENDOR_Init(void)
     }
 
     // Initialise core vendor hooks structure with callbacks
-    // NOTE: commit/abort transaction callbacks are not registered as it was found that abort is not 
+    // NOTE: commit/abort transaction callbacks are not registered as it was found that abort is not
     //       supported consistently across all RDK parameters
     memset(&core_callbacks, 0, sizeof(core_callbacks));
     core_callbacks.reboot_cb = RDK_Reboot;
@@ -265,7 +265,7 @@ int VENDOR_Init(void)
 ** VENDOR_Start
 **
 ** Called after data model has been registered and after instance numbers have been read from the USP database
-** Typically this function is used to seed the data model with instance numbers or 
+** Typically this function is used to seed the data model with instance numbers or
 ** initialise internal data structures which require the data model to be running to access parameters
 **
 ** \param   None
@@ -327,7 +327,7 @@ void WaitForRdkComponentsReady(void)
     int num_values = 0;
     parameterValStruct_t **values = NULL;
     int count = 0;
-  
+
     while (ccsp_err != CCSP_SUCCESS)
     {
         // Wait until pam component is running
@@ -380,7 +380,7 @@ int FixupRebootCause(void)
     {
         return err;
     }
-    
+
     // Convert RDK's reboot cause to a USP reboot cause
     // NOTE: RDK's reboot cause does not distinguish between local and remote forms of reboot/factory reset
     // So we just assume that the cause was remotely initiated
@@ -464,7 +464,7 @@ int RegisterRdkComponents(char *filename)
         }
 
         // Add this component to the end of the rdk_components vector
-        num_rdk_components++;        
+        num_rdk_components++;
         rdk_components = USP_REALLOC(rdk_components, num_rdk_components*sizeof(rdk_component_t));
         rdkc = &rdk_components[num_rdk_components-1];
         rdkc->group_name = USP_STRDUP(group_name);
@@ -868,7 +868,7 @@ int CalcIsWritable(char *str, bool *is_writable, int line_number)
     {
         USP_ERR_SetMessage("%s: Failed to convert %s at line %d (expecting 'RW' or 'RO')", __FUNCTION__, str, line_number);
         return USP_ERR_INTERNAL_ERROR;
-    }    
+    }
 
     return USP_ERR_OK;
 }
@@ -920,7 +920,7 @@ bool IsTopLevelObject(char *path)
     char *first_instance_separator;
     char *after_first_instance_separator;
     char *next_instance_separator;
-    
+
     #define INSTANCE_SEPARATOR "{i}"
     first_instance_separator = strstr(path, INSTANCE_SEPARATOR);
     if (first_instance_separator == NULL)
@@ -931,7 +931,7 @@ bool IsTopLevelObject(char *path)
 
     // Skip the instance separator
     after_first_instance_separator = first_instance_separator + sizeof(INSTANCE_SEPARATOR) - 1;
-    
+
 
     // Exit if there is more than one instance separator, and hence this is not a top level multi-instance object
     next_instance_separator = strstr(after_first_instance_separator, INSTANCE_SEPARATOR);
@@ -939,7 +939,7 @@ bool IsTopLevelObject(char *path)
     {
         return false;
     }
-    
+
     return true;
 }
 
@@ -1180,10 +1180,11 @@ int RDK_GetEndpointId(char *buf, int len)
 {
     int err;
     kv_vector_t pv;
-    kv_pair_t params[2];
-    char *scheme = "os";
+    kv_pair_t params[3];
+    char *scheme = "ops";
     char *oui;
     char *serial_number;
+    char *product_class;
     int size;
     int i;
     int pam_group_id = INVALID;
@@ -1206,12 +1207,14 @@ int RDK_GetEndpointId(char *buf, int len)
     }
 
     // Populate structure specifying the parameters to get
-    pv.num_entries = 2;
+    pv.num_entries = 3;
     pv.vector = params;
     params[0].key = "Device.DeviceInfo.ManufacturerOUI";
     params[0].value = NULL;
     params[1].key = "Device.DeviceInfo.SerialNumber";
     params[1].value = NULL;
+    params[2].key = "Device.DeviceInfo.ProductClass";
+    params[2].value = NULL;
 
     // Exit if failed to retrieve the parameters
     USP_ASSERT(strcmp(rdk_components[pam_group_id].group_name, "pam")==0);
@@ -1221,12 +1224,13 @@ int RDK_GetEndpointId(char *buf, int len)
         goto exit;
     }
 
-    // Exit if OUI or serial number were not retrieved
+    // Exit if OUI or serial number or product class were not retrieved
     oui = params[0].value;
     serial_number = params[1].value;
-    if ((oui == NULL) || (serial_number == NULL) || (oui[0] == '\0') || (serial_number[0] == '\0'))
+    product_class = params[2].value;
+    if ((oui == NULL) || (serial_number == NULL) || (product_class == NULL) || (oui[0] == '\0') || (serial_number[0] == '\0') || (product_class[0] == '\0'))
     {
-        USP_LOG_Error("%s: Failed to retrieve ManufacturerOUI or SerialNumber", __FUNCTION__);
+        USP_LOG_Error("%s: Failed to retrieve ManufacturerOUI or SerialNumber or ProductClass", __FUNCTION__);
         err = USP_ERR_INTERNAL_ERROR;
     }
 
@@ -1249,12 +1253,13 @@ int RDK_GetEndpointId(char *buf, int len)
     }
 
     // Form the endpoint_id
-    USP_SNPRINTF(buf, len, "%s::%s-%s", scheme, oui, serial_number);
+    USP_SNPRINTF(buf, len, "%s::%s-%s-%s", scheme, oui, product_class, serial_number);
     err = USP_ERR_OK;
 
 exit:
     USP_SAFE_FREE(params[0].value);
     USP_SAFE_FREE(params[1].value);
+    USP_SAFE_FREE(params[2].value);
     return err;
 }
 
@@ -1431,8 +1436,8 @@ exit:
 ** \param   group_id - ID of the group to get
 ** \param   params - key-value vector containing the parameter names as keys, and the values
 ** \param   param_types - array containing the type of each parameter in the params vector
-** \param   failure_index - pointer to value in which to return the index of the first parameter in the params vector 
-**                          that failed to be set. Not changing this value or setting it to 
+** \param   failure_index - pointer to value in which to return the index of the first parameter in the params vector
+**                          that failed to be set. Not changing this value or setting it to
 **                          INVALID indicates that all parameters failed (e.g. communications failure)
 **
 ** \return  USP_ERR_OK if successful
@@ -1471,7 +1476,7 @@ int RDK_SetGroup(int group_id, kv_vector_t *params, unsigned *param_types, int *
 
     // Exit if unable to set the parameters, logging the first parameter that caused the fault
     #define RDK_COMMIT_NOW 1
-    ccsp_err = CcspBaseIf_setParameterValues(bus_handle, rdkc->component_name, rdkc->dbus_path, 
+    ccsp_err = CcspBaseIf_setParameterValues(bus_handle, rdkc->component_name, rdkc->dbus_path,
                                            RDK_SESSION_ID, CCSP_USP_WRITE_ID,
                                            rdk_params, params->num_entries,
                                            RDK_COMMIT_NOW, &fault_param);
@@ -1487,7 +1492,7 @@ int RDK_SetGroup(int group_id, kv_vector_t *params, unsigned *param_types, int *
         {
             // If the code gets here, then a parameter was indicated by RDK
             USP_ERR_SetMessage("%s: CcspBaseIf_setParameterValues(%s) failed (%d - %s)", __FUNCTION__, fault_param, ccsp_err, ToCcspErrString(ccsp_err));
-    
+
             // Determine the index of the failed parameter in the parameters we were attempting to set
             for (i=0; i < params->num_entries; i++)
             {
@@ -1551,7 +1556,7 @@ int RDK_RefreshInstances(int group_id, char *path, int *expiry_period)
     // Exit if unable to determine all instances provided by this rdk component
     rdkc = &rdk_components[group_id];
 
-    ccsp_err = CcspBaseIf_getParameterNames(bus_handle, rdkc->component_name, rdkc->dbus_path, path, 0, 
+    ccsp_err = CcspBaseIf_getParameterNames(bus_handle, rdkc->component_name, rdkc->dbus_path, path, 0,
                                           &num_param_infos, &param_infos);
     if (ccsp_err != CCSP_SUCCESS)
     {
@@ -1681,7 +1686,7 @@ int RdkResetInner(char *group_name, char *path, char *value, char *debug_msg)
 
     // Exit if unable to set the parameter
     rdkc = &rdk_components[group_id];
-    ccsp_err = CcspBaseIf_setParameterValues(bus_handle, rdkc->component_name, rdkc->dbus_path, 
+    ccsp_err = CcspBaseIf_setParameterValues(bus_handle, rdkc->component_name, rdkc->dbus_path,
                                              RDK_SESSION_ID, CCSP_USP_WRITE_ID,
                                              &rdk_param, 1,
                                              RDK_COMMIT_NOW, &fault_param);
@@ -1851,7 +1856,7 @@ int DiscoverDM_ForComponent(rdk_component_t *rdkc, kv_vector_t *rdk_objects, kv_
 
     // Exit if unable to determine all instances provided by this rdk component
     USP_LOG_Info("%s: Getting parameters and objects for '%s'", __FUNCTION__, rdkc->group_name);
-    ccsp_err = CcspBaseIf_getParameterNames(bus_handle, rdkc->component_name, rdkc->dbus_path, "Device.", 0, 
+    ccsp_err = CcspBaseIf_getParameterNames(bus_handle, rdkc->component_name, rdkc->dbus_path, "Device.", 0,
                                           &num_param_infos, &param_infos);
     if (ccsp_err != CCSP_SUCCESS)
     {
@@ -2055,7 +2060,7 @@ void ConvertInstantiatedToSchemaPath(char *src, char *dest, int len)
             // Copy across the dot
             *dest++ = c;
             len--;
-            
+
             // Determine the number of digits, if the following path segment is a number
             p = src;
             c = *p++;
@@ -2140,7 +2145,7 @@ void AddMissingObjs(kv_vector_t *rdk_objects, kv_vector_t *rdk_params, kv_vector
                 {
                     // Form object's properties
                     // NOTE: Guessing at read write status as RO
-                    p = strchr(kv->value, ' '); 
+                    p = strchr(kv->value, ' ');
                     *p = '\0';          // Temporarily truncate the value string, to form just the group_name
                     USP_SNPRINTF(buf, sizeof(buf), "%s RO", kv->value);
                     *p = ' ';           // Restore the group_name
@@ -2219,7 +2224,7 @@ exit:
     fclose(fp);
     return err;
 }
- 
+
 /*********************************************************************//**
 **
 ** rdk_malloc
@@ -2253,5 +2258,3 @@ void rdk_free(void *ptr)
 {
     free(ptr);
 }
-
-
