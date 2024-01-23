@@ -1380,6 +1380,7 @@ int RDK_GetGroup(int group_id, kv_vector_t *params)
     for (i=0; i < params->num_entries; i++)
     {
         paths[i] = params->vector[i].key;
+        USP_LOG_Debug("%s: paths[%d] = %s", __FUNCTION__, i, paths[i]);
     }
 
 
@@ -1472,6 +1473,7 @@ int RDK_SetGroup(int group_id, kv_vector_t *params, unsigned *param_types, int *
         pvs->parameterName = kv->key;
         pvs->parameterValue = kv->value;
         pvs->type = UspTypeToRdkType(param_types[i]);
+        USP_LOG_Debug("%s: key = %s, value = %s", __FUNCTION__, kv->key, kv->value);
     }
 
     // Exit if unable to set the parameters, logging the first parameter that caused the fault
@@ -1552,6 +1554,8 @@ int RDK_RefreshInstances(int group_id, char *path, int *expiry_period)
         USP_ERR_SetMessage("%s: called before connected to D-Bus", __FUNCTION__);
         return USP_ERR_INTERNAL_ERROR;
     }
+
+    USP_LOG_Debug("%s: path = %s", __FUNCTION__, path);
 
     // Exit if unable to determine all instances provided by this rdk component
     rdkc = &rdk_components[group_id];
